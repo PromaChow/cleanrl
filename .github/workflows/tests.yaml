@@ -1,56 +1,18 @@
 name: tests
 on:
-  pull_request:
-    paths-ignore:
-      - '**/README.md'
-      - 'docs/**/*'
-      - 'cloud/**/*'
+  push:
+    branches:
+      - main
+
 jobs:
-  test-core-envs:
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-        os: [ubuntu-22.04]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-      - run: uv venv
-
-      # classic control tests
-      - name: Install core dependencies
-        run: uv pip install ".[pytest]"
-      - name: Run core tests
-        run: uv run pytest tests/test_classic_control.py
-      - name: Install jax
-        if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: uv pip install ".[pytest, jax]"
-      - name: Run gymnasium tests
-        run: uv run pytest tests/test_classic_control_gymnasium.py
-      - name: Run core tests with jax
-        if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: uv run pytest tests/test_classic_control_jax_gymnasium.py
-      - name: Run gae tests with jax
-        if: runner.os == 'Linux' || runner.os == 'macOS'
-        run: uv run pytest tests/test_jax_compute_gae.py
-      - name: Install tuner dependencies
-        run: uv pip install ".[pytest, optuna]"
-      - name: Run tuner tests
-        run: uv run pytest tests/test_tuner.py
-
   test-atari-envs:
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-        os: [ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -58,110 +20,99 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       - run: uv venv
-
-      # atari tests
+      - id: measurement-5
+        name: Record Measurement After Step
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Step
+          task: get-measurement
       - name: Install atari dependencies
         run: uv pip install ".[pytest, atari]"
+      - id: measurement-7
+        name: Record Measurement After Install atari dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install atari dependencies
+          task: get-measurement
       - name: Run atari tests
         run: uv run pytest tests/test_atari.py
-      - name: Install jax
-        if: runner.os == 'Linux' || runner.os == 'macOS'
+      - id: measurement-9
+        name: Record Measurement After Run atari tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run atari tests
+          task: get-measurement
+      - if: runner.os == 'Linux' || runner.os == 'macOS'
+        name: Install jax
         run: uv pip install ".[pytest, atari, jax]"
+      - id: measurement-11
+        name: Record Measurement After Install jax
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install jax
+          task: get-measurement
       - name: Run gymnasium migration dependencies
         run: uv run pip install "gymnasium[atari,accept-rom-license]==0.28.1" "ale-py==0.8.1"
+      - id: measurement-13
+        name: Record Measurement After Run gymnasium migration dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run gymnasium migration dependencies
+          task: get-measurement
       - name: Run gymnasium tests
         run: uv run pytest tests/test_atari_gymnasium.py
-      - name: Run gymnasium tests with jax
-        if: runner.os == 'Linux' || runner.os == 'macOS'
+      - id: measurement-15
+        name: Record Measurement After Run gymnasium tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run gymnasium tests
+          task: get-measurement
+      - if: runner.os == 'Linux' || runner.os == 'macOS'
+        name: Run gymnasium tests with jax
         run: uv run pytest tests/test_atari_jax_gymnasium.py
-
-  test-procgen-envs:
+      - id: measurement-17
+        name: Record Measurement After Run gymnasium tests with jax
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run gymnasium tests with jax
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-        os: [ubuntu-22.04]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-      - run: uv venv
-
-      # procgen tests
-      - name: Install core dependencies
-        run: uv pip install ".[pytest, procgen]"
-      - name: Downgrade setuptools
-        run: uv run pip install setuptools==59.5.0
-      - name: Run procgen tests
-        run: uv run pytest tests/test_procgen.py
-
-  test-mujoco-envs:
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-        os: [ubuntu-22.04]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-      - run: uv venv
-      - name: Setup virtual display
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y xvfb
-          export DISPLAY=:99
-          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
-
-      # mujoco tests
-      - name: Install dependencies
-        run: uv pip install ".[pytest, mujoco, dm_control, jax]"
-      - name: install mujoco dependencies
-        run: |
-          sudo apt-get update && sudo apt-get -y install libgl1-mesa-glx libosmesa6 libglfw3
-      - name: Run mujoco tests
-        run: uv run pytest tests/test_mujoco.py
-        env:
-          DISPLAY: :99
-
-  test-envpool-envs:
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-        os: [ubuntu-22.04]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-      - run: uv venv
-
-      # envpool tests
-      - name: Install envpool dependencies
-        run: uv pip install ".[pytest, envpool, jax]"
-      - name: Run envpool tests
-        run: uv run pytest tests/test_envpool.py
-
+        os:
+          - ubuntu-22.04
+        python-version:
+          - '3.8'
+          - '3.9'
+          - '3.10'
   test-atari-multigpu-envs:
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-        os: [ubuntu-22.04]
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -169,21 +120,61 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       - run: uv venv
-
-      # atari multigpu tests
+      - id: measurement-5
+        name: Record Measurement After Step
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Step
+          task: get-measurement
       - name: Install atari dependencies
         run: uv pip install ".[pytest, atari]"
+      - id: measurement-7
+        name: Record Measurement After Install atari dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install atari dependencies
+          task: get-measurement
       - name: Run atari tests
         run: uv run pytest tests/test_atari_multigpu.py
-
-  test-pettingzoo-envs:
+      - id: measurement-9
+        name: Record Measurement After Run atari tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run atari tests
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
-        os: [ubuntu-22.04]
+        os:
+          - ubuntu-22.04
+        python-version:
+          - '3.8'
+          - '3.9'
+          - '3.10'
+  test-core-envs:
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -191,11 +182,404 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
       - run: uv venv
+      - id: measurement-5
+        name: Record Measurement After Step
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Step
+          task: get-measurement
+      - name: Install core dependencies
+        run: uv pip install ".[pytest]"
+      - id: measurement-7
+        name: Record Measurement After Install core dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install core dependencies
+          task: get-measurement
+      - name: Run core tests
+        run: uv run pytest tests/test_classic_control.py
+      - id: measurement-9
+        name: Record Measurement After Run core tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run core tests
+          task: get-measurement
+      - if: runner.os == 'Linux' || runner.os == 'macOS'
+        name: Install jax
+        run: uv pip install ".[pytest, jax]"
+      - id: measurement-11
+        name: Record Measurement After Install jax
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install jax
+          task: get-measurement
+      - name: Run gymnasium tests
+        run: uv run pytest tests/test_classic_control_gymnasium.py
+      - id: measurement-13
+        name: Record Measurement After Run gymnasium tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run gymnasium tests
+          task: get-measurement
+      - if: runner.os == 'Linux' || runner.os == 'macOS'
+        name: Run core tests with jax
+        run: uv run pytest tests/test_classic_control_jax_gymnasium.py
+      - id: measurement-15
+        name: Record Measurement After Run core tests with jax
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run core tests with jax
+          task: get-measurement
+      - if: runner.os == 'Linux' || runner.os == 'macOS'
+        name: Run gae tests with jax
+        run: uv run pytest tests/test_jax_compute_gae.py
+      - id: measurement-17
+        name: Record Measurement After Run gae tests with jax
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run gae tests with jax
+          task: get-measurement
+      - name: Install tuner dependencies
+        run: uv pip install ".[pytest, optuna]"
+      - id: measurement-19
+        name: Record Measurement After Install tuner dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install tuner dependencies
+          task: get-measurement
+      - name: Run tuner tests
+        run: uv run pytest tests/test_tuner.py
+      - id: measurement-21
+        name: Record Measurement After Run tuner tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run tuner tests
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+        python-version:
+          - '3.8'
+          - '3.9'
+          - '3.10'
+  test-envpool-envs:
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - run: uv venv
+      - id: measurement-5
+        name: Record Measurement After Step
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Step
+          task: get-measurement
+      - name: Install envpool dependencies
+        run: uv pip install ".[pytest, envpool, jax]"
+      - id: measurement-7
+        name: Record Measurement After Install envpool dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install envpool dependencies
+          task: get-measurement
+      - name: Run envpool tests
+        run: uv run pytest tests/test_envpool.py
+      - id: measurement-9
+        name: Record Measurement After Run envpool tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run envpool tests
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+        python-version:
+          - '3.8'
+          - '3.9'
+          - '3.10'
+  test-mujoco-envs:
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - run: uv venv
+      - id: measurement-5
+        name: Record Measurement After Step
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Step
+          task: get-measurement
+      - name: Setup virtual display
+        run: 'sudo apt-get update
 
-      # pettingzoo tests
+          sudo apt-get install -y xvfb
+
+          export DISPLAY=:99
+
+          Xvfb :99 -screen 0 1024x768x24 > /dev/null 2>&1 &
+
+          '
+      - id: measurement-7
+        name: Record Measurement After Setup virtual display
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Setup virtual display
+          task: get-measurement
+      - name: Install dependencies
+        run: uv pip install ".[pytest, mujoco, dm_control, jax]"
+      - id: measurement-9
+        name: Record Measurement After Install dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install dependencies
+          task: get-measurement
+      - name: install mujoco dependencies
+        run: 'sudo apt-get update && sudo apt-get -y install libgl1-mesa-glx libosmesa6
+          libglfw3
+
+          '
+      - id: measurement-11
+        name: Record Measurement After install mujoco dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: install mujoco dependencies
+          task: get-measurement
+      - env:
+          DISPLAY: :99
+        name: Run mujoco tests
+        run: uv run pytest tests/test_mujoco.py
+      - id: measurement-13
+        name: Record Measurement After Run mujoco tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run mujoco tests
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+        python-version:
+          - '3.8'
+          - '3.9'
+          - '3.10'
+  test-pettingzoo-envs:
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - run: uv venv
+      - id: measurement-5
+        name: Record Measurement After Step
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Step
+          task: get-measurement
       - name: Install pettingzoo dependencies
         run: uv pip install ".[pytest, pettingzoo, atari]"
+      - id: measurement-7
+        name: Record Measurement After Install pettingzoo dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install pettingzoo dependencies
+          task: get-measurement
       - name: Install ROMs
         run: uv run AutoROM --accept-license
+      - id: measurement-9
+        name: Record Measurement After Install ROMs
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install ROMs
+          task: get-measurement
       - name: Run pettingzoo tests
         run: uv run pytest tests/test_pettingzoo_ma_atari.py
+      - id: measurement-11
+        name: Record Measurement After Run pettingzoo tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run pettingzoo tests
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+        python-version:
+          - '3.8'
+          - '3.9'
+          - '3.10'
+  test-procgen-envs:
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Start Energy Measurement
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: start-measurement
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - run: uv venv
+      - id: measurement-5
+        name: Record Measurement After Step
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Step
+          task: get-measurement
+      - name: Install core dependencies
+        run: uv pip install ".[pytest, procgen]"
+      - id: measurement-7
+        name: Record Measurement After Install core dependencies
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Install core dependencies
+          task: get-measurement
+      - name: Downgrade setuptools
+        run: uv run pip install setuptools==59.5.0
+      - id: measurement-9
+        name: Record Measurement After Downgrade setuptools
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Downgrade setuptools
+          task: get-measurement
+      - name: Run procgen tests
+        run: uv run pytest tests/test_procgen.py
+      - id: measurement-11
+        name: Record Measurement After Run procgen tests
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          label: Run procgen tests
+          task: get-measurement
+      - id: display-measurement
+        name: Display Energy Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@862050e4f01f65b1436e5eca18ba4bd85562f0de
+        with:
+          json-output: true
+          task: display-results
+      - name: Save Total Energy Consumption Data
+        run: echo '${{ steps.final-measurement.outputs.data-total-json }}' > total_energy_consumption.json
+      - name: Upload Energy Consumption Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: total-energy-consumption
+          path: total_energy_consumption.json
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+        python-version:
+          - '3.8'
+          - '3.9'
+          - '3.10'
